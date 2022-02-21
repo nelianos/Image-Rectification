@@ -426,12 +426,12 @@ def compute_homography(hw, vp1, vp2, clip=True, clip_factor=3):
 
     final_homography = np.dot(T, inter_matrix)
 
-    return np.linalg.inv(final_homography), (max_y, max_x)
+    return final_homography, (max_y, max_x)
 
 
 def compute_homography_and_warp(image, *args, **kwargs):
     H, hw = compute_homography(image.shape[:2], *args, **kwargs)
-    warped_img = transform.warp(image, H, output_shape=hw)
+    warped_img = transform.warp(image, np.linalg.inv(H), output_shape=hw)
     return warped_img
 
 
