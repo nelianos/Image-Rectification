@@ -325,7 +325,7 @@ def remove_inliers(model, edgelets, threshold_inlier=10):
     return edgelets
 
 
-def compute_homography_and_warp(image, vp1, vp2, clip=True, clip_factor=3):
+def compute_homography(hw, vp1, vp2, clip=True, clip_factor=3):
     """Compute homography from vanishing points and warp the image.
 
     It is assumed that vp1 and vp2 correspond to horizontal and vertical
@@ -339,7 +339,7 @@ def compute_homography_and_warp(image, vp1, vp2, clip=True, clip_factor=3):
     Parameters
     ----------
     image: ndarray
-        Image which has to be wrapped.
+        (height, width) of the image which has to be wrapped.
     vp1: ndarray of shape (3, )
         First vanishing point in homogenous coordinate system.
     vp2: ndarray of shape (3, )
@@ -349,11 +349,16 @@ def compute_homography_and_warp(image, vp1, vp2, clip=True, clip_factor=3):
     clip_factor: float, optional
         Proportion of image in multiples of image size to be retained if gone
         out of bounds after homography.
+
     Returns
     -------
-    warped_img: ndarray
-        Image warped using homography as described above.
+    np.ndarray
+        (3,3) homography to transform the original to the rectified image
+    tuple
+        (height, width) of the rectified image canvas
     """
+
+    h, w = hw
     # Find Projective Transform
     vanishing_line = np.cross(vp1, vp2)
     H = np.eye(3)
@@ -392,8 +397,8 @@ def compute_homography_and_warp(image, vp1, vp2, clip=True, clip_factor=3):
     # Translate so that whole of the image is covered
     inter_matrix = np.dot(A, H)
 
-    cords = np.dot(inter_matrix, [[0, 0, image.shape[1], image.shape[1]],
-                                  [0, image.shape[0], 0, image.shape[0]],
+    cords = np.dot(inter_matrix, [[0, 0, w, w],
+                                  [0, h, 0, h],
                                   [1, 1, 1, 1]])
     cords = cords[:2] / cords[2]
 
@@ -405,7 +410,7 @@ def compute_homography_and_warp(image, vp1, vp2, clip=True, clip_factor=3):
 
     if clip:
         # These might be too large. Clip them.
-        max_offset = max(image.shape) * clip_factor / 2
+        max_offset = max(h, w) * clip_factor / 2
         tx = max(tx, -max_offset)
         ty = max(ty, -max_offset)
 
@@ -421,8 +426,12 @@ def compute_homography_and_warp(image, vp1, vp2, clip=True, clip_factor=3):
 
     final_homography = np.dot(T, inter_matrix)
 
-    warped_img = transform.warp(image, np.linalg.inv(final_homography),
-                                output_shape=(max_y, max_x))
+    return np.linalg.inv(final_homography), (max_y, max_x)
+
+
+def compute_homography_and_warp(image, *args, **kwargs):
+    H, hw = compute_homography(image.shape[:2], *args, **kwargs)
+    warped_img = transform.warp(image, H, output_shape=hw)
     return warped_img
 
 
